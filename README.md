@@ -2,127 +2,61 @@
 <img  src="https://raw.githubusercontent.com/chenfan0/fideo-live-record/main/src/renderer/src/assets/images/light/logo.png" />
 </div>
 
-[中文文档](https://github.com/chenfan0/fideo-live-record/blob/main/README-CN.md)
+## ✋🏻 简介
+这是一个基于`React` `Ffmpeg` `Electron` `Shadcn`, `FRP` 的**直播录制软件**。支持监控直播，可以帮助用户简单便捷的对直播进行录制并保存为MP4格式的视频。
 
+Fideo 官方网站：[https://www.fideo.site/cn](https://www.fideo.site/cn)
 
-## ✋🏻Introduction
-This is a **live recording software** based on `React`, `Ffmpeg`, `Electron`, `Shadcn`, `FRP`. It supports monitoring live streams, making it simple and convenient for users to record live streams and save them as MP4 videos.
+## 已支持平台
+YouTube Twitch TikTok 抖音 快手 B站 网易 CC 花椒 微博 斗鱼 淘宝 Bigo YY 虎牙 京东 时光 陌陌 17LIVE 小红书 AcFun 畅聊 vv直播 克拉克拉
 
-Fideo official website: [https://www.fideo.site/en](https://www.fideo.site/en)
-
-## Supported Platforms
-- [x] [YouTube](https://www.youtube.com/)
-- [x] [Twitch](https://www.twitch.tv/)
-- [x] [TikTok](https://www.tiktok.com/live/)
-- [x] [Douyin](https://live.douyin.com/)
-- [x] [Kuaishou](https://live.kuaishou.com/)
-- [x] [Bilibili](https://live.bilibili.com/)
-- [x] [网易 CC](https://cc.163.com/)
-- [x] [Huajiao](https://www.huajiao.com/)
-- [x] [Weibo](https://weibo.com/l/wblive/p/show/1022:2321325052506609680949)
-- [x] [Douyu](https://www.douyu.com/)
-- [x] [Taobao](https://tbzb.taobao.com/)
-- [x] [Bigo](https://www.bigo.tv/)
-- [x] [YY](https://www.yy.com/)
-- [x] [Huya](https://www.huya.com/)
-- [x] [JingDong](https://lives.jd.com/?gx=RnAomTM2bDTeycsRqY1xDB5XAqGk-_s&gxd=RnAowmELOTLbyMkU_td0X9meMe1XxD0&ad_od=share&utm_source=androidapp&utm_medium=appshare&utm_campaign=t_335139774&utm_term=Wxfriends#/26510406?origin=2&appid=jdzb&sharer=jd_69imfpj372dqx7&user=zO8hBVAu84FG84VVLu%2BpjzHlo69Mkg6%2B)
-- [x] [shiguang](https://www.rengzu.com/)
-- [x] [momo](https://web.immomo.com/player/liveBroadcast.html#/liveBroadcast?roomid=14799927435342&src=m71000-rcmdtype999-linkmode1-seat1-modeid0-mid96765286)
-- [x] [17LIVE](https://17.live/en/live)
-- [x] [xiaohongshu](https://www.xiaohongshu.com/)
-- [x] [AcFun](https://live.acfun.cn/)
-- [x] [畅聊](https://www.tlclw.com/)
-- [x] [vv](https://h5webcdn-pro.vvxqiu.com/)
-- [x] [克拉克拉](https://live.kilakila.cn/)
-
-## 📚 User Guide
-#### 🔧 Installation
-- Go to [Release](https://github.com/chenfan0/fideo-live-record/releases) and download the version for your operating system and install it.
-#### 🔨 Mac Shows File is Damaged
-- Enter the following command in the terminal
+## 📚 使用说明
+#### 🔧 安装
+- 进入 [Release](https://github.com/chenfan0/fideo-live-record/releases) 下载对应操作系统版本并安装即可。
+#### 🔨 Mac显示文件已损坏
+- 在终端输入以下命令即可
 ```shell
 sudo xattr -r -d com.apple.quarantine /Applications/Fideo.app
 ```
-#### 💉 Windows Reports a Virus
-- Simply ignore the warning.
+#### 💉 windows报病毒
+- 直接忽略即可
 
-#### 🔓 Download Blocked by Browser
-- Try downloading with a different browser.
+#### 🔓 下载时被浏览器屏蔽
+- 尝试更换浏览器下载
 
-#### 🍪 How to Get Cookie
-- [Cookie Acquisition Tutorial](https://www.youtube.com/watch?v=sz07F5inaFg)
+#### 🍪 如何获取cookie
+- [获取cookie教程](https://www.bilibili.com/video/BV1G24y1o75g/?spm_id_from=333.337.search-card.all.click&vd_source=7175c3866fe9ca259066ef7898056268)
 
-#### 🛰 How to Push Notifications via WeChat
-- The WeChat push notification feature uses the API from [Xizhi](https://xz.qqoq.net/). You need to register an account and obtain an API Key.
-- Enter the **Xizhi** API Key in the default settings to use it.
+#### 🛰 如何微信推送
+- 微信推送的功能使用的是 [息知](https://xz.qqoq.net/) 的API，需要自行注册账号并获取API Key。
+- 在默认设置中填入 **息知** 的API Key即可。
 
-#### 📱 Web Operation
-- Get the activation code and input it, then start the function to access the software via the phone.
+#### 📱 网页操作
+- 获取激活并输入激活码，然后启动该功能即可在手机访问网页进行软件操作。
 
-## ❓How to Run Locally?
+## ❓ 如何在本地运行？
+##### 需要npm环境node.js
+##### Windows 用户：
+##### 下载地址：https://www.gyan.dev/ffmpeg/builds/
+##### 解压并把 bin 目录添加到系统 PATH
 ```shell
+npm install -g pnpm
+```
+获取当前目录，加到path系统环境变量才能使用pnpm命令
+```shell
+npm config get prefix
+```
+electron是前端用于打包成exe文件或者linux系统用的文件
+```shell
+pnpm -v
+pnpm add -D electron
 pnpm install
 ```
 ```shell
-pnpm debug
+$env:DEBUG = "fideo-*"
+pnpm run dev
 ```
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=chenfan0/fideo-live-record&type=Date)](https://star-history.com/#chenfan0/fideo-live-record&Date)
-
-## Disclaimer
-The "fideo-live-record" software is provided for personal learning and research purposes only. Users must comply with the terms of service of the respective platforms and abide by local laws and regulations when using this software. Users are solely responsible for any actions and consequences arising from the use of this software, including but not limited to legal and financial liabilities. The developer is not liable for any direct or indirect damages resulting from the use, modification, or redistribution of this software.
-
-**Modifications and Redistribution**
-
-Users are permitted to modify and redistribute this software in accordance with the open-source license agreement, but they must clearly distinguish their modified version from the original version and must not imply any affiliation with the original developer. Any legal disputes or liabilities arising from the modification or redistribution of this software are the sole responsibility of the individual or entity performing those actions. The developer is not responsible for any modifications, redistributions, or other derivative works created by third parties.
-
-
-**Technical Support and Maintenance**
-
-This software is provided "as is" without any form of technical support, maintenance, or updates. The developer reserves the right to discontinue the development, support, and updates for this software at any time without notice. Users assume all risks associated with using outdated or unsupported software.
-
-**No Warranty**
-
-This software is provided without any warranty of any kind, whether express or implied, including but not limited to warranties of performance, reliability, suitability, or fitness for a particular purpose. Users are responsible for evaluating the software's applicability before use and assume all risks and consequences associated with its use.
-
-**Miscellaneous**
-
-This disclaimer applies to all users of this software. The developer reserves the right to update this disclaimer at any time without prior notice. By using this software, you agree to these terms. If you do not agree to any of these terms, please discontinue use of this software immediately and delete all related files. If you have any questions, please consult a legal advisor.
-
-## Fideo Privacy Policy
-
-### Introduction
-
-Fideo is an open-source software, and we highly value your privacy. This privacy policy aims to explain how we (or more precisely, how we do not) handle your personal information.
-
-### Fideo Software
-
-#### No Personal Information Collection
-
-Fideo software does not collect, store, or process any user personal information. Our software runs locally on your device and does not transmit any data to our servers or third parties.
-
-#### Open Source Software
-
-Fideo is an open-source project. This means anyone can view, audit, and contribute to our source code. This further ensures the transparency and security of our software.
-
-#### Local Data
-
-All data generated or processed by Fideo software is saved on your local device. We cannot access this data and will not attempt to do so.
-
-### Fideo Website
-
-#### Website Analytics
-
-The Fideo website may use third-party analytics tools (such as Google Analytics) to collect anonymous statistical data about website usage. This data is used to improve our website experience and will not be used to identify individual users.
-
-### Policy Changes
-
-If we make any significant changes to our privacy policy, we will update the content on this page.
-
-### Contact Us
-
-If you have any questions or suggestions regarding this privacy policy, please contact us through our GitHub project page.
-
-By using Fideo software or visiting the Fideo website, you agree to the terms of this privacy policy. If you do not agree to these terms, please do not use our software or visit our website.
+打包成exe,需要管理员权限的cmd窗口运行，需要几分钟时间打包,然后在dist目录内带版本号的exe可安装文件
+```shell
+pnpm exec electron-builder
+```
