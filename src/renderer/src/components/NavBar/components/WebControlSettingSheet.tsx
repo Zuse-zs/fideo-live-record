@@ -3,7 +3,6 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { useTranslation } from 'react-i18next'
-import validator from 'validator'
 
 import { Button } from '@/shadcn/ui/button'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/shadcn/ui/form'
@@ -11,27 +10,19 @@ import { Sheet, SheetContent, SheetFooter, SheetHeader, SheetTitle } from '@/sha
 import { Input } from '@/shadcn/ui/input'
 import { Switch } from '@/shadcn/ui/switch'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/shadcn/ui/tooltip'
-import {
-  Dialog as ShadcnDialog,
-  DialogContent as ShadcnDialogContent,
-  DialogHeader as ShadcnDialogHeader,
-  DialogTitle as ShadcnDialogTitle
-} from '@/shadcn/ui/dialog'
 import { useWebControlSettingStore } from '@/store/useWebControlSettingStore'
 import { useStreamConfigStore } from '@/store/useStreamConfigStore'
 import { useLoadingStore } from '@/store/useLoadingStore'
-import { useConfettiStore } from '@/store/useConfettiStore'
 import { useToast } from '@/hooks/useToast'
 
 import { closeWebSocket, createWebSocket, sendMessage } from '@/lib/websocket'
 import emitter from '@/lib/bus'
-import { START_WEB_CONTROL, WEBSOCKET_MESSAGE_TYPE, API_DOMAIN } from '../../../../../const'
+import { START_WEB_CONTROL, WEBSOCKET_MESSAGE_TYPE } from '../../../../../const'
 import { errorCodeToI18nMessage, SUCCESS_CODE } from '../../../../../code'
 
 const formSchema = z.object({
   webControlPath: z.string(),
-  enableWebControl: z.boolean(),
-  email: z.string()
+  enableWebControl: z.boolean()
 })
 
 interface StreamConfigSheetProps {
@@ -39,15 +30,9 @@ interface StreamConfigSheetProps {
   setSheetOpen: (status: boolean) => void
 }
 
-const initialTitle = 'Fideo网页访问激活码(一个月)'
-const initialMoney = 9.99
-
-let intervalCheckOrderStatusTimer: NodeJS.Timeout | null = null
-
 export default function WebControlSettingSheet(props: StreamConfigSheetProps) {
   const { t } = useTranslation()
   const { setLoading } = useLoadingStore()
-  const { setShowConfetti } = useConfettiStore()
   const { sheetOpen, setSheetOpen } = props
 
   const { webControlSetting, setWebControlSetting } = useWebControlSettingStore((state) => state)
@@ -55,17 +40,13 @@ export default function WebControlSettingSheet(props: StreamConfigSheetProps) {
     (state) => state
   )
 
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [qrcode, setQrcode] = useState('')
-  const [title, setTitle] = useState(initialTitle)
-  const [money, setMoney] = useState(initialMoney)
-
   const { toast } = useToast()
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      ...webControlSetting
+      webControlPath: webControlSetting.webControlPath || '',
+      enableWebControl: webControlSetting.enableWebControl
     }
   })
 
@@ -76,7 +57,12 @@ export default function WebControlSettingSheet(props: StreamConfigSheetProps) {
       const webControlPath = currentWebControlSetting.webControlPath
       const isSuccess = await startFrpc(webControlPath).catch(() => false)
       if (!isSuccess) {
-        await setWebControlSetting({ ...currentWebControlSetting, enableWebControl: false })
+        await setWebControlSetting({ 
+          ...currentWebControlSetting, 
+          enableWebControl: false,
+          localIP: '',
+          localPort: ''
+        })
 
         toast({
           title: t('web_control_setting.start_web_control_failed'),
@@ -100,7 +86,10 @@ export default function WebControlSettingSheet(props: StreamConfigSheetProps) {
   }, [useWebControlSettingStore])
 
   useEffect(() => {
-    form.reset({ ...webControlSetting })
+    form.reset({ 
+      webControlPath: webControlSetting.webControlPath || '',
+      enableWebControl: webControlSetting.enableWebControl
+    })
   }, [webControlSetting])
 
   useEffect(() => {
@@ -111,142 +100,46 @@ export default function WebControlSettingSheet(props: StreamConfigSheetProps) {
         description: err,
         variant: 'destructive'
       })
-      await setWebControlSetting({ ...currentWebControlSetting, enableWebControl: false })
+      await setWebControlSetting({ 
+        ...currentWebControlSetting, 
+        enableWebControl: false,
+        localIP: '',
+        localPort: ''
+      })
       closeWebSocket()
     })
   }, [])
 
   const handleSetSheetOpen = async (status: boolean, trigger = false) => {
-    const formValues = form.getValues() as IWebControlSetting
+    const formValues = form.getValues()
     if (trigger) {
-      await setWebControlSetting(formValues)
+      await setWebControlSetting({
+        ...webControlSetting,
+        webControlPath: formValues.webControlPath,
+        enableWebControl: formValues.enableWebControl
+      })
     }
 
-    setQrcode('')
     setSheetOpen(status)
     form.reset()
   }
 
-  const handleClosePayingDialog = (status: boolean) => {
-    setDialogOpen(status)
-    if (!status) {
-      if (intervalCheckOrderStatusTimer) {
-        clearTimeout(intervalCheckOrderStatusTimer)
-      }
-
-      setQrcode('')
-      setTitle(initialTitle)
-      setMoney(initialMoney)
+  const generateRandomPath = () => {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'
+    let result = ''
+    for (let i = 0; i < 8; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length))
     }
+    return result
   }
 
-  function intervalCheckOrderStatus(orderId: number) {
-    fetch(`https://${API_DOMAIN}/api/pay/check`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        orderId
-      })
-    }).then((res) => {
-      res
-        .json()
-        .then(async ({ code, data: webControlPath }) => {
-          if (code === 200) {
-            form.setValue('webControlPath', webControlPath)
-            await setWebControlSetting(form.getValues())
-            setDialogOpen(false)
-            setShowConfetti(true)
-            toast({
-              title: t('web_control_setting.get_web_control_path_success'),
-              description: t('web_control_setting.get_web_control_path_success_desc')
-            })
-          } else {
-            if (intervalCheckOrderStatusTimer) {
-              clearTimeout(intervalCheckOrderStatusTimer)
-            }
-
-            intervalCheckOrderStatusTimer = setTimeout(() => {
-              intervalCheckOrderStatus(orderId)
-            }, 1000)
-          }
-        })
-        .catch(() => {
-          if (intervalCheckOrderStatusTimer) {
-            clearTimeout(intervalCheckOrderStatusTimer)
-          }
-
-          intervalCheckOrderStatusTimer = setTimeout(() => {
-            intervalCheckOrderStatus(orderId)
-          }, 1000)
-        })
+  const handleGenerateWebControlPath = () => {
+    const randomPath = generateRandomPath()
+    form.setValue('webControlPath', randomPath)
+    toast({
+      title: t('web_control_setting.generate_path_success'),
+      description: t('web_control_setting.generate_path_success_desc')
     })
-  }
-
-  const handleGetWebControlPath = async () => {
-    const email = form.getValues('email')
-    if (!email) {
-      form.setError('email', { message: t('web_control_setting.email_required') })
-      return
-    }
-
-    if (!validator.isEmail(email)) {
-      form.setError('email', { message: t('web_control_setting.email_invalid') })
-      return
-    }
-
-    form.clearErrors('email')
-    setLoading(true)
-
-    try {
-      const res = await fetch(`https://${API_DOMAIN}/api/pay/wx`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          email
-        })
-      })
-      const { code, data } = (await res.json()) as {
-        code: number
-        data: { orderId: number; qrcode: string; title: string; money: number }
-      }
-
-      if (code !== 200) {
-        toast({
-          title: t('web_control_setting.get_web_control_path_failed'),
-          description: t('web_control_setting.get_web_control_path_failed_desc'),
-          variant: 'destructive'
-        })
-        return
-      }
-      const { orderId, qrcode, title, money } = data
-
-      setQrcode(qrcode)
-      setTitle(title)
-      setMoney(money)
-
-      setDialogOpen(true)
-      intervalCheckOrderStatusTimer = setTimeout(() => {
-        intervalCheckOrderStatus(orderId)
-      }, 2000)
-    } catch (error) {
-      console.error(error)
-
-      setDialogOpen(false)
-      setLoading(false)
-      setTitle(initialTitle)
-      setMoney(initialMoney)
-      toast({
-        title: t('web_control_setting.get_web_control_path_failed'),
-        description: t('web_control_setting.get_web_control_path_failed_desc'),
-        variant: 'destructive'
-      })
-    } finally {
-      setLoading(false)
-    }
   }
 
   const websocketOnMessage = (event: MessageEvent) => {
@@ -300,7 +193,7 @@ export default function WebControlSettingSheet(props: StreamConfigSheetProps) {
 
   const startFrpc = async (webControlPath: string) => {
     setLoading(true)
-    const { status: isSuccess, code, port } = await window.api.startFrpcProcess(webControlPath)
+    const { status: isSuccess, code, port, localIP } = await window.api.startFrpcProcess(webControlPath)
     const formValues = form.getValues()
 
     if (isSuccess) {
@@ -314,7 +207,13 @@ export default function WebControlSettingSheet(props: StreamConfigSheetProps) {
       closeWebSocket()
     }
 
-    setWebControlSetting({ ...formValues, enableWebControl: isSuccess })
+    setWebControlSetting({ 
+      ...webControlSetting,
+      webControlPath: formValues.webControlPath,
+      enableWebControl: isSuccess,
+      localIP: localIP || '127.0.0.1',
+      localPort: (port || '8080').toString()
+    })
 
     const prefix = 'web_control_setting.start_web_control'
     toast({
@@ -330,12 +229,11 @@ export default function WebControlSettingSheet(props: StreamConfigSheetProps) {
   const handleToggleWebControl = async (status: boolean, field: any) => {
     form.clearErrors('webControlPath')
     if (status) {
-      const webControlPath = form.getValues('webControlPath')
+      let webControlPath = form.getValues('webControlPath')
       if (!webControlPath) {
-        form.setError('webControlPath', {
-          message: t('web_control_setting.web_control_path_required')
-        })
-        return
+        // 如果没有设置路径，自动生成一个
+        webControlPath = generateRandomPath()
+        form.setValue('webControlPath', webControlPath)
       }
 
       const isSuccess = await startFrpc(webControlPath)
@@ -349,7 +247,13 @@ export default function WebControlSettingSheet(props: StreamConfigSheetProps) {
     window.api.stopFrpcProcess()
     closeWebSocket()
     field.onChange(status)
-    setWebControlSetting({ ...form.getValues() })
+    setWebControlSetting({ 
+      ...webControlSetting,
+      webControlPath: form.getValues('webControlPath'),
+      enableWebControl: status,
+      localIP: '',
+      localPort: ''
+    })
 
     toast({
       title: t('web_control_setting.stop_web_control_success'),
@@ -358,148 +262,113 @@ export default function WebControlSettingSheet(props: StreamConfigSheetProps) {
   }
 
   return (
-    <>
-      <Sheet open={sheetOpen} onOpenChange={(status) => handleSetSheetOpen(status)}>
-        <SheetContent className="flex flex-col">
-          <SheetHeader>
-            <SheetTitle>{t('web_control_setting.title')}</SheetTitle>
-          </SheetHeader>
-          <div className="show-scrollbar overflow-y-auto mr-[-14px]">
-            <div className=" pl-1 pr-4 pb-2">
-              <Form {...form}>
-                <form className="space-y-8">
-                  <FormField
-                    control={form.control}
-                    name="webControlPath"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t('web_control_setting.web_control_path')}</FormLabel>
-                        <FormControl>
-                          <div className="flex gap-2">
-                            <Input
-                              placeholder={t('web_control_setting.web_control_path_placeholder')}
-                              {...field}
-                            />
-                            <Button
-                              variant="outline"
-                              type="button"
-                              onClick={handleGetWebControlPath}
-                            >
-                              {t('web_control_setting.get_web_control_path')}
-                            </Button>
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t('web_control_setting.email')}</FormLabel>
-                        <FormControl>
-                          <div className="flex gap-2">
-                            <Input
-                              placeholder={t('web_control_setting.email_placeholder')}
-                              {...field}
-                            />
-                          </div>
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+    <Sheet open={sheetOpen} onOpenChange={(status) => handleSetSheetOpen(status)}>
+      <SheetContent className="flex flex-col">
+        <SheetHeader>
+          <SheetTitle>{t('web_control_setting.title')}</SheetTitle>
+        </SheetHeader>
+        <div className="show-scrollbar overflow-y-auto mr-[-14px]">
+          <div className=" pl-1 pr-4 pb-2">
+            <Form {...form}>
+              <form className="space-y-8">
+                <FormField
+                  control={form.control}
+                  name="webControlPath"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('web_control_setting.web_control_path')}</FormLabel>
+                      <FormControl>
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder={t('web_control_setting.web_control_path_placeholder')}
+                            {...field}
+                          />
+                          <Button
+                            variant="outline"
+                            type="button"
+                            onClick={handleGenerateWebControlPath}
+                          >
+                            {t('web_control_setting.generate_path')}
+                          </Button>
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="enableWebControl"
+                  render={({ field }) => (
+                    <FormItem>
+                      <TooltipProvider delayDuration={400}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <FormLabel className=" cursor-pointer">
+                              {t('web_control_setting.enable_web_control')}
+                            </FormLabel>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p className="max-w-[400px]">
+                              {t('web_control_setting.enable_web_control_tooltip')}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={(status) => handleToggleWebControl(status, field)}
+                        className="flex"
+                      />
+                    </FormItem>
+                  )}
+                />
+                {form.getValues('enableWebControl') && form.getValues('webControlPath') && (
                   <FormField
                     control={form.control}
                     name="enableWebControl"
-                    render={({ field }) => (
+                    render={() => (
                       <FormItem>
-                        <TooltipProvider delayDuration={400}>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <FormLabel className=" cursor-pointer">
-                                {t('web_control_setting.enable_web_control')}
-                              </FormLabel>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="max-w-[400px]">
-                                {t('web_control_setting.enable_web_control_tooltip')}
-                              </p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={(status) => handleToggleWebControl(status, field)}
-                          className="flex"
-                        />
+                        <FormLabel>{t('web_control_setting.web_control_address')}</FormLabel>
+
+                        <FormControl>
+                          <TooltipProvider delayDuration={400}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="overflow-hidden  text-ellipsis text-nowrap">
+                                  <a
+                                    className="cursor-pointer underline"
+                                    onClick={() => {
+                                      const webControlUrl = `http://${webControlSetting.localIP || '127.0.0.1'}:${webControlSetting.localPort || '8080'}/${form.getValues('webControlPath')}`
+                                      window.api.navByDefaultBrowser(webControlUrl)
+                                    }}
+                                  >
+                                    {`http://${webControlSetting.localIP || '127.0.0.1'}:${webControlSetting.localPort || '8080'}/${form.getValues('webControlPath')}`}
+                                  </a>
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <div>
+                                  {`http://${webControlSetting.localIP || '127.0.0.1'}:${webControlSetting.localPort || '8080'}/${form.getValues('webControlPath')}`}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </FormControl>
                       </FormItem>
                     )}
                   />
-                  {form.getValues('enableWebControl') && form.getValues('webControlPath') && (
-                    <FormField
-                      control={form.control}
-                      name="enableWebControl"
-                      render={() => (
-                        <FormItem>
-                          <FormLabel>{t('web_control_setting.web_control_address')}</FormLabel>
-
-                          <FormControl>
-                            <TooltipProvider delayDuration={400}>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <div className="overflow-hidden  text-ellipsis text-nowrap">
-                                    <a
-                                      className="cursor-pointer underline"
-                                      onClick={() => {
-                                        window.api.navByDefaultBrowser(
-                                          `https://web-control.fideo.site/${form.getValues('webControlPath')}`
-                                        )
-                                      }}
-                                    >
-                                      {`https://web-control.fideo.site/${form.getValues('webControlPath')}`}
-                                    </a>
-                                  </div>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <div>
-                                    {`https://web-control.fideo.site/${form.getValues('webControlPath')}`}
-                                  </div>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          </FormControl>
-                        </FormItem>
-                      )}
-                    />
-                  )}
-                </form>
-              </Form>
-            </div>
+                )}
+              </form>
+            </Form>
           </div>
-          <SheetFooter>
-            <Button variant="secondary" onClick={() => handleSetSheetOpen(false, true)}>
-              {t('stream_config.confirm')}
-            </Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
-      <ShadcnDialog open={dialogOpen} onOpenChange={(status) => handleClosePayingDialog(status)}>
-        <ShadcnDialogContent>
-          <ShadcnDialogHeader>
-            <ShadcnDialogTitle className="mt-[20px] text-center">
-              <p>{title}</p>
-              <p className="mt-3">关注 公众号 “Fideo” 获取3天试用的激活码</p>
-            </ShadcnDialogTitle>
-          </ShadcnDialogHeader>
-          <div className="flex justify-center h-[280px]">
-            {qrcode && <img className="h-[280px]" src={qrcode}></img>}
-          </div>
-          <p className="mt-3 text-center">{`￥${money}`}</p>
-        </ShadcnDialogContent>
-      </ShadcnDialog>
-    </>
+        </div>
+        <SheetFooter>
+          <Button variant="secondary" onClick={() => handleSetSheetOpen(false, true)}>
+            {t('stream_config.confirm')}
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   )
 }

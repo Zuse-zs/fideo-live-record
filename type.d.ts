@@ -39,5 +39,6 @@ interface IDownloadDepProgressInfo {
 interface IWebControlSetting {
   webControlPath: string
   enableWebControl: boolean
-  email: string
+  localIP?: string
+  localPort?: string
 }

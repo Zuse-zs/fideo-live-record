@@ -29,7 +29,7 @@ declare global {
       forceCloseWindow: () => void
       retryDownloadDep: () => void
 
-      startFrpcProcess: (code: string) => Promise<{ status: boolean; code?: string; port?: number }>
+      startFrpcProcess: (code: string) => Promise<{ status: boolean; code?: string; port?: number; localIP?: string }>
       stopFrpcProcess: () => void
 
       onStreamRecordEnd: (callback: (id: string, code: number, errMsg?: string) => void) => void

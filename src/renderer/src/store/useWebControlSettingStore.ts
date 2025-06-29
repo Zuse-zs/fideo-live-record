@@ -14,7 +14,8 @@ export const useWebControlSettingStore = create<IWebControlSettingStore>((set) =
   webControlSetting: {
     webControlPath: '',
     enableWebControl: false,
-    email: ''
+    localIP: '',
+    localPort: ''
   },
   initData: async () => {
     const webControlSetting = await localForage.getItem<IWebControlSetting>('webControlSetting')

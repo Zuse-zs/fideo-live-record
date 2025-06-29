@@ -11,7 +11,7 @@ import fastifyCompress from '@fastify/compress'
 
 import WebSocket from 'ws'
 import spawn from 'cross-spawn'
-import { FRP_DOMAIN, FRPC_PROCESS_ERROR, WEBSOCKET_MESSAGE_TYPE } from '../../const'
+import { FRPC_PROCESS_ERROR, WEBSOCKET_MESSAGE_TYPE } from '../../const'
 
 import debug from 'debug'
 
@@ -22,6 +22,8 @@ const isMac = os.platform() === 'darwin'
 export let frpcObj: {
   frpcProcess: ChildProcess
   stopFrpcLocalServer: () => void
+  localPort: string
+  localIP: string
 } | null = null
 
 export function stopFrpc() {
@@ -30,12 +32,29 @@ export function stopFrpc() {
   frpcObj = null
 }
 
+// 获取本地IP地址
+function getLocalIP(): string {
+  const interfaces = os.networkInterfaces()
+  for (const name of Object.keys(interfaces)) {
+    const iface = interfaces[name]
+    if (iface) {
+      for (const alias of iface) {
+        if (alias.family === 'IPv4' && alias.address !== '127.0.0.1' && !alias.internal) {
+          return alias.address
+        }
+      }
+    }
+  }
+  return '127.0.0.1' // 如果没有找到合适的IP，返回localhost
+}
+
 async function startFrpcLocalServer(
   code: string
-): Promise<{ port: string; stopFrpcLocalServer: () => void }> {
+): Promise<{ port: string; stopFrpcLocalServer: () => void; localIP: string }> {
   let resolve!: (value: unknown) => void, reject!: (reason?: any) => void
 
   let port: string
+  const localIP = getLocalIP()
 
   const p = new Promise((_resolve, _reject) => {
     resolve = _resolve
@@ -70,8 +89,7 @@ async function startFrpcLocalServer(
         .toString()
         .replace(
           '__WEBSOCKET_URL__',
-          // is.dev ? `ws://localhost:${port}` : `wss://${FRP_DOMAIN}/${code}`
-          `"wss://${FRP_DOMAIN}/${code}"`
+          `"ws://${localIP}:${port}"`
         )
         .replaceAll('__WEB_CONTROL_CODE__', code)
 
@@ -172,7 +190,8 @@ async function startFrpcLocalServer(
 
     resolve({
       port,
-      stopFrpcLocalServer
+      stopFrpcLocalServer,
+      localIP
     })
   })
 
@@ -190,86 +209,25 @@ export async function startFrpcProcess(
     writeLog('frpc', 'code: ' + code)
     log('code: ', code)
     const userPath = app.getPath('userData')
-    const { port, stopFrpcLocalServer } = await startFrpcLocalServer(code)
+    const { port, stopFrpcLocalServer, localIP } = await startFrpcLocalServer(code)
     writeLog('frpc', 'port: ' + port)
+    writeLog('frpc', 'localIP: ' + localIP)
     log('port: ', port)
+    log('localIP: ', localIP)
 
-    const frpcConfig = `
-      serverAddr = "${FRP_DOMAIN}"
-      auth.token = "fideo-frp"
-      loginFailExit = false
-      [transport]
-      heartbeatInterval = 60
-      heartbeatTimeout = 180
-      tcpMuxKeepaliveInterval = -1
-      dialServerTimeout = 30
-      [[proxies]]
-      name = "${code}"
-      type = "http"
-      localPort = ${port}
-      customDomains = ["${FRP_DOMAIN}"]
-      locations = ["/${code}"]
-      healthCheck.type = "http"
-      healthCheck.path = "/health"
-    `
-    const frpcConfigPath = join(userPath, 'frpc.toml')
-
-    await fsp.writeFile(frpcConfigPath, frpcConfig, { encoding: 'utf-8' })
-
-    writeLog('frpc', 'frpcConfigPath: ' + frpcConfigPath)
-
-    const frpcPath = is.dev
-      ? join(__dirname, '../../resources/frpc/mac/arm64/frpc')
-      : isMac
-        ? join(process.resourcesPath, 'frpc')
-        : join(process.resourcesPath, 'frpc.exe')
-
-    const frpcProcess = spawn(frpcPath, ['-c', frpcConfigPath])
-
-    const frpcProcessCheck = () => {
-      if (!frpcProcess) return false
-      try {
-        process.kill(frpcProcess.pid!, 0)
-        return true
-      } catch (err) {
-        return false
-      }
-    }
-
-    frpcProcess.stdout?.on('data', (data) => {
-      const str = data.toString()
-      writeLog('frpc', 'frpcProcess stdout: ' + str)
-      log('frpcProcess stdout: ', str)
-      if (str.includes('Fideo FRPS ERROR: ')) {
-        stopFrpc()
-        win.webContents.send(FRPC_PROCESS_ERROR, str)
-      }
-    })
-
-    frpcProcess.stdout?.on('error', (err) => {
-      writeLog('frpc', 'frpcProcess stdout error: ' + err)
-      log('frpcProcess stdout error: ', err)
-      stopFrpc()
-      win.webContents.send(FRPC_PROCESS_ERROR, err)
-    })
-
-    frpcProcessTimer = setInterval(() => {
-      const isAlive = frpcProcessCheck()
-      if (!isAlive) {
-        writeLog('frpc', 'frpcProcess isAlive: ' + isAlive)
-        stopFrpcLocalServer()
-        clearInterval(frpcProcessTimer)
-      }
-    }, 5000)
-
+    // 不再需要frpc进程，直接使用本地服务器
     frpcObj = {
-      frpcProcess,
-      stopFrpcLocalServer
+      frpcProcess: { kill: () => {} } as any, // 创建一个空的进程对象
+      stopFrpcLocalServer,
+      localPort: port,
+      localIP
     }
+
     return {
       status: true,
       code,
-      port
+      port,
+      localIP
     }
   } catch {
     return {
